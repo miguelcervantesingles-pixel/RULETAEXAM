@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>English Race</title>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;overflow-x:hidden;background:#0a0a2e;color:#fff;min-height:100vh}
+.hidden{display:none!important}
+.view{display:none;min-height:100vh;flex-direction:column;align-items:center}
+.view.active{display:flex}
+
+/* ── LOBBY ── */
+#lobby{width:100%;max-width:500px;padding:30px 20px;text-align:center;z-index:2;margin:0 auto;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.floating-cars-bg{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:1;overflow:hidden}
+.floating-car{position:absolute;animation:floatAcross linear infinite}
+@keyframes floatAcross{0%{transform:translateX(-150px)}100%{transform:translateX(calc(100vw + 150px))}}
+.rainbow-title{font-size:3.5rem;font-weight:900;margin-bottom:10px;letter-spacing:5px;text-shadow:0 0 30px rgba(255,255,255,.2);display:flex;gap:3px;flex-wrap:wrap;justify-content:center;line-height:1.2}
+.rainbow-title span:nth-child(1){color:#ff4136}
+.rainbow-title span:nth-child(2){color:#ff851b}
+.rainbow-title span:nth-child(3){color:#ffdc00}
+.rainbow-title span:nth-child(4){color:#2ecc40}
+.rainbow-title span:nth-child(5){color:#0074d9}
+.rainbow-title span:nth-child(6){color:#b10dc9}
+.rainbow-title span:nth-child(7){color:#ff4136}
+.rainbow-title span:nth-child(8){color:#ff851b}
+.rainbow-title span:nth-child(9){color:#ffdc00}
+.rainbow-title span:nth-child(10){color:#2ecc40}
+.rainbow-title span:nth-child(11){color:#0074d9}
+.rainbow-title span:nth-child(12){color:#b10dc9}
+.subtitle{font-size:1rem;color:rgba(255,255,255,.4);margin-bottom:30px;letter-spacing:3px}
+#nameInput{width:100%;padding:15px 20px;font-size:1.2rem;border:none;border-radius:12px;background:rgba(255,255,255,.1);color:#fff;margin-bottom:25px;text-align:center;border:2px solid transparent}
+#nameInput:focus{outline:none;border-color:#ff851b;background:rgba(255,255,255,.15)}
+#nameInput::placeholder{color:rgba(255,255,255,.3)}
+.color-picker{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;margin-bottom:30px}
+.color-btn{width:48px;height:48px;border-radius:50%;border:3px solid transparent;cursor:pointer;transition:.25s;position:relative}
+.color-btn:hover{transform:scale(1.15)}
+.color-btn.selected{border-color:#fff;box-shadow:0 0 20px rgba(255,255,255,.5)}
+.color-btn.selected::after{content:'\2713';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#fff;font-size:1.4rem;font-weight:bold;text-shadow:0 0 6px rgba(0,0,0,.8)}
+#joinBtn{padding:16px 50px;font-size:1.3rem;font-weight:bold;border:none;border-radius:50px;background:linear-gradient(135deg,#ff4136,#ff851b);color:#fff;cursor:pointer;transition:.3s;box-shadow:0 5px 25px rgba(255,65,54,.4)}
+#joinBtn:hover:not(:disabled){transform:translateY(-3px);box-shadow:0 8px 35px rgba(255,65,54,.6)}
+#joinBtn:disabled{opacity:.5;cursor:not-allowed}
+.waiting-msg{font-size:1.15rem;color:rgba(255,255,255,.5);margin-top:20px;animation:pulse 1.6s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+/* ── PLAYER GAME ── */
+#playerGame{width:100%;max-width:700px;padding:15px;display:flex;flex-direction:column;align-items:center;min-height:100vh;justify-content:center}
+#playerGame .inner{width:100%;max-width:600px;margin:0 auto}
+.player-header{width:100%;display:flex;justify-content:space-between;align-items:center;padding:10px 15px;background:rgba(255,255,255,.06);border-radius:12px;margin-bottom:12px;font-size:.9rem}
+.player-header .pname{font-weight:bold;color:#ffdc00}
+.track-container{width:100%;margin:8px 0 12px;flex-shrink:0}
+.track{width:100%;height:65px;background:linear-gradient(180deg,#2a2a4a,#3a3a5a);border-radius:10px;position:relative;overflow:hidden;border:2px solid rgba(255,255,255,.08)}
+.track-surface{position:absolute;top:50%;left:0;right:0;height:3px;background:repeating-linear-gradient(90deg,rgba(255,255,255,.2) 0,rgba(255,255,255,.2) 15px,transparent 15px,transparent 30px);transform:translateY(-50%);z-index:1}
+.finish-line{position:absolute;top:0;bottom:0;width:8px;left:92%;z-index:3;background:repeating-linear-gradient(0deg,#fff 0,#fff 5px,#222 5px,#222 10px);border-radius:2px}
+.player-car-wrapper{position:absolute;bottom:3px;z-index:4;transition:left .8s cubic-bezier(.34,1.56,.64,1);left:2%}
+.player-car-wrapper .car{font-size:32px;display:block;filter:drop-shadow(0 3px 6px rgba(0,0,0,.6));transform:scaleX(-1)}
+.player-car-wrapper .car-name{font-size:.6rem;text-align:center;color:#fff;font-weight:bold;white-space:nowrap;max-width:60px;overflow:hidden;text-overflow:ellipsis;margin-top:-2px}
+.question-card{background:rgba(255,255,255,.07);border-radius:16px;padding:20px;border:1px solid rgba(255,255,255,.08);animation:fadeIn .35s;width:100%}
+.q-spanish{font-size:1.2rem;color:#ffdc00;font-weight:bold;margin-bottom:12px;padding:8px 12px;background:rgba(255,220,0,.08);border-radius:8px;text-align:center;border:1px solid rgba(255,220,0,.15)}
+.question-number{font-size:.7rem;color:rgba(255,255,255,.4);margin-bottom:6px;text-transform:uppercase;letter-spacing:1px}
+.question-text{font-size:.95rem;margin-bottom:15px;line-height:1.5;color:#ccc}
+.question-options{display:flex;flex-direction:column;gap:10px}
+.q-option{padding:14px 16px;border-radius:10px;background:rgba(255,255,255,.05);border:2px solid rgba(255,255,255,.1);cursor:pointer;transition:.25s;font-size:.92rem;color:#eee;text-align:left}
+.q-option:hover:not(:disabled){background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.25)}
+.q-option.correct{border-color:#2ecc40!important;background:rgba(46,204,64,.2)!important;color:#fff!important}
+.q-option.wrong{border-color:#ff4136!important;background:rgba(255,65,54,.2)!important;color:#fff!important}
+.q-option:disabled{cursor:default}
+.correct-feedback{color:#2ecc40;font-weight:bold;text-align:center;padding:8px;font-size:1rem}
+.wrong-feedback{color:#ff4136;font-weight:bold;text-align:center;padding:8px;font-size:.95rem}
+.waiting-next{text-align:center;color:rgba(255,255,255,.4);padding:15px;font-size:.9rem;animation:pulse 1.6s infinite}
+
+/* ── TEACHER VIEW ── */
+#teacherView{width:100%;min-height:100vh;padding:15px}
+#teacherView h1{text-align:center;margin-bottom:10px;font-size:1.4rem}
+.teacher-controls{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-bottom:10px}
+.teacher-controls button{padding:10px 18px;border:none;border-radius:8px;font-size:.9rem;font-weight:bold;cursor:pointer;transition:.2s}
+.teacher-controls button:disabled{opacity:.4;cursor:not-allowed}
+#startBtn{background:linear-gradient(135deg,#2ecc40,#27ae60);color:#fff}
+#startBtn:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 4px 15px rgba(46,204,64,.3)}
+#nextBtn{background:linear-gradient(135deg,#0074d9,#0056a8);color:#fff}
+#nextBtn:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 4px 15px rgba(0,116,217,.3)}
+#endBtn{background:linear-gradient(135deg,#ff4136,#c0392b);color:#fff}
+#endBtn:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 4px 15px rgba(255,65,54,.3)}
+#resetBtn{background:linear-gradient(135deg,#555,#333);color:#aaa}
+#resetBtn:hover:not(:disabled){transform:translateY(-2px)}
+.teacher-info{display:flex;gap:8px;justify-content:center;margin-bottom:10px;flex-wrap:wrap}
+.info-badge{padding:6px 14px;border-radius:20px;background:rgba(255,255,255,.06);font-size:.8rem;color:rgba(255,255,255,.7)}
+.info-badge strong{color:#ffdc00}
+
+/* ── RACE STREET (teacher) ── */
+.race-street-wrap{width:100%;margin:5px 0}
+.race-street-header{display:flex;align-items:center;padding:2px 0;font-size:.7rem;color:rgba(255,255,255,.3);border-bottom:1px solid rgba(255,255,255,.05);margin-bottom:4px}
+.rsh-name{width:80px;flex-shrink:0;padding-left:4px}
+.rsh-track{flex:1;text-align:center}
+.rsh-pos{width:40px;text-align:center;flex-shrink:0}
+.race-lane{display:flex;align-items:center;margin-bottom:2px;padding:3px 0;border-radius:4px;transition:background .3s}
+.race-lane:hover{background:rgba(255,255,255,.03)}
+.lane-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;margin-right:6px;margin-left:2px}
+.lane-name{font-size:.8rem;font-weight:bold;width:60px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#ddd}
+.lane-track-wrap{flex:1;height:30px;position:relative;background:rgba(255,255,255,.04);border-radius:5px;margin:0 6px;overflow:hidden}
+.lane-track{position:relative;width:100%;height:100%}
+.lane-markers{position:absolute;top:0;left:0;right:0;bottom:0;z-index:1;pointer-events:none}
+.lane-marker{position:absolute;top:0;bottom:0;width:1px;background:rgba(255,255,255,.06)}
+.lane-finish{position:absolute;top:0;bottom:0;width:4px;left:92%;z-index:2;background:repeating-linear-gradient(0deg,#fff 0,#fff 3px,#222 3px,#222 6px)}
+.lane-car{position:absolute;bottom:-2px;z-index:3;transition:left .6s cubic-bezier(.34,1.56,.64,1);font-size:22px;filter:drop-shadow(0 2px 4px rgba(0,0,0,.5));transform:scaleX(-1)}
+.lane-pos-text{font-size:.7rem;color:rgba(255,255,255,.5);width:30px;text-align:center;flex-shrink:0}
+
+/* ── FINISHED OVERLAY ── */
+.finished-badge{position:absolute;top:-12px;right:0;font-size:.5rem;background:#2ecc40;color:#fff;border-radius:6px;padding:1px 5px;font-weight:bold;white-space:nowrap}
+
+/* ── RESULTS ── */
+#resultsView{width:100%;min-height:100vh;padding:25px 20px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start}
+#resultsView .rainbow-title{font-size:2.5rem;margin-bottom:5px}
+.podium{display:flex;align-items:flex-end;justify-content:center;gap:20px;margin:20px 0;flex-wrap:wrap}
+.podium-place{display:flex;flex-direction:column;align-items:center;gap:5px}
+.podium-place .trophy{font-size:3rem}
+.podium-place .place-name{font-weight:bold;font-size:1.05rem}
+.podium-place .place-score{font-size:.8rem;color:rgba(255,255,255,.5)}
+.podium-block{width:95px;border-radius:8px 8px 0 0;display:flex;align-items:flex-end;justify-content:center;padding-bottom:8px}
+.podium-1 .podium-block{height:120px;background:linear-gradient(180deg,#ffd700,#ffb300)}
+.podium-2 .podium-block{height:85px;background:linear-gradient(180deg,#d0d0d0,#a0a0a0)}
+.podium-3 .podium-block{height:55px;background:linear-gradient(180deg,#cd7f32,#b0651a)}
+.podium-label{font-size:.7rem;color:#fff;font-weight:bold;text-align:center}
+.answers-review{width:100%;max-width:550px;margin-top:18px;background:rgba(255,255,255,.05);border-radius:12px;padding:16px}
+.answers-review h3{text-align:center;margin-bottom:10px;color:rgba(255,255,255,.35);font-size:.8rem;text-transform:uppercase;letter-spacing:1px}
+.answer-row{display:flex;justify-content:space-between;align-items:center;padding:6px 8px;border-bottom:1px solid rgba(255,255,255,.04);font-size:.8rem;gap:6px}
+.answer-row:last-child{border:none}
+.answer-row .a-text{flex:1;color:#b0b0b0;font-size:.78rem}
+.answer-row .a-result{font-weight:bold;white-space:nowrap;font-size:.78rem}
+.answer-row .a-result.correct{color:#2ecc40}
+.answer-row .a-result.wrong{color:#ff4136}
+.full-standings{width:100%;max-width:550px;margin-top:18px;background:rgba(255,255,255,.04);border-radius:12px;padding:14px}
+.full-standings h3{text-align:center;margin-bottom:10px;color:rgba(255,255,255,.35);font-size:.8rem;text-transform:uppercase;letter-spacing:1px}
+.standing-row{display:flex;align-items:center;padding:5px 8px;border-bottom:1px solid rgba(255,255,255,.04);font-size:.82rem;gap:8px}
+.standing-row:last-child{border:none}
+.sr-rank{width:24px;text-align:center;font-weight:bold;flex-shrink:0}
+.sr-rank.gold{color:#ffd700}.sr-rank.silver{color:#c0c0c0}.sr-rank.bronze{color:#cd7f32}
+.sr-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.sr-name{flex:1;font-weight:bold;color:#ddd;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sr-stats{text-align:right;color:rgba(255,255,255,.5);font-size:.75rem;white-space:nowrap;flex-shrink:0}
+.sr-stats .sr-correct{color:#2ecc40}
+.sr-stats .sr-wrong{color:#ff4136}
+.play-again-btn{padding:14px 40px;font-size:1.1rem;font-weight:bold;border:none;border-radius:50px;background:linear-gradient(135deg,#ff4136,#ff851b);color:#fff;cursor:pointer;margin:20px 0 15px;transition:.3s}
+.play-again-btn:hover{transform:translateY(-2px);box-shadow:0 5px 25px rgba(255,65,54,.4)}
+
+/* ── MODE SWITCHER ── */
+.mode-switcher{position:fixed;bottom:10px;right:10px;z-index:100;display:flex;gap:4px}
+.mode-btn{padding:6px 12px;border:none;border-radius:6px;font-size:.7rem;cursor:pointer;background:rgba(255,255,255,.07);color:rgba(255,255,255,.4);transition:.25s}
+.mode-btn.active{background:#ff851b;color:#fff;font-weight:bold}
+.mode-btn:hover:not(.active){background:rgba(255,255,255,.12)}
+
+/* ── CONFETTI ── */
+.confetti-container{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:50;overflow:hidden}
+.confetti{position:absolute;width:9px;height:9px;top:-15px;animation:confettiFall linear forwards}
+@keyframes confettiFall{0%{transform:translateY(0) rotate(0deg);opacity:1}100%{transform:translateY(110vh) rotate(720deg);opacity:0}}
+
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+@media(max-width:600px){
+  .rainbow-title{font-size:2rem}
+  #lobby{padding:20px 15px}
+  .track{height:55px}
+  .player-car-wrapper .car{font-size:26px}
+  .question-card{padding:14px}
+  .q-option{padding:11px 13px;font-size:.88rem}
+  .q-spanish{font-size:1rem;padding:6px 10px}
+  .podium-block{width:70px}
+  .podium-1 .podium-block{height:100px}
+  .podium-2 .podium-block{height:70px}
+  .podium-3 .podium-block{height:45px}
+  .lane-name{font-size:.7rem;width:45px}
+  .lane-car{font-size:18px}
+  .rsh-name{width:55px}
+  .lane-pos-text{font-size:.6rem;width:25px}
+}
+</style>
+</head>
+<body>
+
+<div class="floating-cars-bg" id="floatingCarsBg"></div>
+
+<!-- ───── LOBBY ───── -->
+<div id="lobby" class="view active">
+  <h1 class="rainbow-title">
+    <span>E</span><span>N</span><span>G</span><span>L</span><span>I</span><span>S</span><span>H</span>
+    <span>&#8203;</span>
+    <span>R</span><span>A</span><span>C</span><span>E</span>
+  </h1>
+  <div class="subtitle">&#9733; Choose the correct English form &#9733;</div>
+  <input type="text" id="nameInput" placeholder="Your name..." maxlength="20" autocomplete="off">
+  <p style="color:rgba(255,255,255,.4);font-size:.85rem;margin-bottom:12px">&#127663; Pick your car color:</p>
+  <div class="color-picker" id="colorPicker"></div>
+  <button id="joinBtn">&#127937; Join the Race!</button>
+  <div id="waitingMsg" class="waiting-msg hidden">&#9203; Waiting for the teacher to start...</div>
+</div>
+
+<!-- ───── PLAYER GAME ───── -->
+<div id="playerGame" class="view">
+  <div class="inner">
+    <div class="player-header">
+      <span><span class="pname" id="playerNameDisplay"></span> &#127937;</span>
+      <span id="playerQCount">0 / 0</span>
+    </div>
+    <div class="track-container">
+      <div class="track">
+        <div class="track-surface"></div>
+        <div class="finish-line"></div>
+        <div class="player-car-wrapper" id="playerCarWrapper" style="left:2%">
+          <span class="car" id="playerCarEmoji">&#128663;</span>
+          <div class="car-name" id="playerCarName">You</div>
+        </div>
+      </div>
+    </div>
+    <div class="question-card" id="questionCard">
+      <div class="q-spanish" id="qSpanish"></div>
+      <div class="question-number" id="qNumber">QUESTION 1</div>
+      <div class="question-text">Which is the correct English form?</div>
+      <div class="question-options" id="qOptions"></div>
+      <div id="qFeedback" class="hidden" style="margin-top:12px"></div>
+      <div id="qWaiting" class="waiting-next hidden">&#9203; Loading next...</div>
+    </div>
+  </div>
+</div>
+
+<!-- ───── TEACHER VIEW ───── -->
+<div id="teacherView" class="view">
+  <h1>&#128663; Race Street</h1>
+  <div class="teacher-controls">
+    <button id="startBtn">&#9654; Start Race</button>
+    <button id="endBtn">&#9632; End Race</button>
+    <button id="resetBtn">&#8634; Reset</button>
+  </div>
+  <div class="teacher-info">
+    <span class="info-badge">&#128100; <strong id="tPlayers">0</strong> racers</span>
+    <span class="info-badge">&#127937; Finished: <strong id="tFinished">0</strong></span>
+    <span class="info-badge">&#127942; Top speed: <strong id="tTopSpeed">0</strong></span>
+  </div>
+  <div class="race-street-wrap" id="raceStreetWrap"></div>
+</div>
+
+<!-- ───── RESULTS ───── -->
+<div id="resultsView" class="view">
+  <h1 class="rainbow-title"><span>&#127942;</span><span>R</span><span>E</span><span>S</span><span>U</span><span>L</span><span>T</span><span>S</span></h1>
+  <div class="podium" id="podium"></div>
+  <div class="full-standings" id="fullStandings" style="display:none">
+    <h3>All Racers</h3>
+    <div id="standingsList"></div>
+  </div>
+  <div class="answers-review" id="resultsAnswersReview" style="display:none">
+    <h3 id="resultsAnswersHeading">Your Results</h3>
+    <div id="resultsAnswersList"></div>
+  </div>
+  <button class="play-again-btn" id="playAgainBtn">&#128260; Play Again</button>
+</div>
+
+<!-- ───── MODE SWITCHER ───── -->
+<div class="mode-switcher">
+  <button class="mode-btn active" id="playerModeBtn">&#128100; Player</button>
+  <button class="mode-btn" id="teacherModeBtn">&#128218; Teacher</button>
+</div>
+
+<div class="confetti-container" id="confettiContainer"></div>
+
+<script>
+// ═══════════════════════════════════════
+//  FIREBASE CONFIG
+// ═══════════════════════════════════════
+const firebaseConfig = { databaseURL: "https://satunit67-default-rtdb.firebaseio.com" };
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+// ═══════════════════════════════════════
+//  QUESTIONS — Edit freely
+//  Each: { spanish, options: [A, B], correct: 0|1 }
+// ═══════════════════════════════════════
+const QUESTIONS = [
+  { spanish: "No hay prisa.",                        options: ["There's no need to hurry", "There's no need of hurry"], correct: 0 },
+  { spanish: "Hay mucho tiempo.",                    options: ["There's plenty of time", "There's plenty time"], correct: 0 },
+  { spanish: "Hago 9.40 en la carrera.",             options: ["I make it in 9.40", "I did it in 9.40"], correct: 1 },
+  { spanish: "Nunca se sabe.",                       options: ["You never know", "Never is known"], correct: 0 },
+  { spanish: "Tu reloj debe estar atrasado.",         options: ["Your watch must be slow", "Your watch is late"], correct: 0 },
+  { spanish: "No por una hora al menos.",            options: ["Not for an hour at least", "Not for a hour at least"], correct: 0 },
+  { spanish: "Hasta luego.",                         options: ["See you later", "See you more later"], correct: 0 },
+  { spanish: "Siempre tarda siglos.",                options: ["It always takes ages", "It always takes age"], correct: 0 },
+  { spanish: "La \u00faltima vez.",                  options: ["Last time", "Last occasion"], correct: 0 },
+  { spanish: "Honestamente.",                        options: ["Last time", "Honestly"], correct: 1 },
+  { spanish: "Le tomar\u00e1 un rato hacerlo.",       options: ["It'll take her a while to do it", "It'll take her a while for do it"], correct: 0 },
+  { spanish: "Justo \u00edbamos de camino.",          options: ["We were just on our way", "We were just in our way"], correct: 0 },
+  { spanish: "Espera un minuto.",                    options: ["Hold on a minute", "Hold a minute"], correct: 0 },
+  { spanish: "Justo a tiempo.",                      options: ["Just in time", "Just on time"], correct: 0 },
+  { spanish: "No tienes tiempo para hacerlo.",        options: ["You haven't got time to do it", "You don't have got time to do it"], correct: 0 },
+  { spanish: "Ten una larga espera.",                options: ["Have a long wait", "Have a long waiting"], correct: 0 },
+  { spanish: "No te molestes en hacerlo.",            options: ["Don't bother to do it", "Don't bother yourself to do it"], correct: 0 },
+  { spanish: "No a esta hora de la noche.",          options: ["Not at this time of the night", "Not in this time of the night"], correct: 0 },
+  { spanish: "Ya era hora.",                         options: ["About time too", "About time as well"], correct: 0 },
+  { spanish: "No tardar\u00e9.",                      options: ["I won't be long", "I won't be long time"], correct: 0 },
+  { spanish: "Agotado.",                             options: ["Tired out", "Tired off"], correct: 0 },
+  { spanish: "Al lado de la calle principal.",        options: ["It's just off the high street", "It's just out the high street"], correct: 0 },
+  { spanish: "Prefiero llegar temprano que tarde.",   options: ["I'd rather we were too early than too late", "I'd rather to be early than late"], correct: 0 },
+  { spanish: "No tengo tiempo.",                     options: ["I don't have time", "I have not time"], correct: 0 }
+];
+const TOTAL = QUESTIONS.length;
+const COLORS = ['#ff4136','#ff851b','#ffdc00','#2ecc40','#0074d9','#b10dc9','#e91e63','#00bcd4','#ff5722','#8bc34a','#9c27b0','#ff9800'];
+
+// ── State ──
+let mode = 'player';
+let myId = null;
+let myName = '';
+let myColor = COLORS[0];
+let phase = 'lobby';
+let students = {};
+let autoEnding = false;
+let nextQuestionTimer = null;
+
+// ── DOM ──
+const $ = id => document.getElementById(id);
+const lobbyEl = $('lobby');
+const playerGameEl = $('playerGame');
+const teacherViewEl = $('teacherView');
+const resultsViewEl = $('resultsView');
+const nameInput = $('nameInput');
+const joinBtn = $('joinBtn');
+const colorPicker = $('colorPicker');
+
+// ═════════════════════════════════════
+//  INIT
+// ═════════════════════════════════════
+function init() {
+  buildColorPicker();
+  buildFloatingCars();
+  setupModeSwitcher();
+  setupLobby();
+  setupTeacherBtns();
+  listenGame();
+  listenStudents();
+}
+
+function buildFloatingCars() {
+  const c = $('floatingCarsBg');
+  const cars = ['&#128663;','&#127949;','&#128662;','&#127950;','&#128661;','&#128660;'];
+  for (let i = 0; i < 14; i++) {
+    const e = document.createElement('div');
+    e.className = 'floating-car'; e.innerHTML = cars[i % cars.length];
+    e.style.top = (5 + Math.random() * 88) + '%';
+    e.style.fontSize = (22 + Math.random() * 38) + 'px';
+    e.style.opacity = .06 + Math.random() * .1;
+    e.style.animationDuration = (14 + Math.random() * 24) + 's';
+    e.style.animationDelay = (Math.random() * 18) + 's';
+    c.appendChild(e);
+  }
+}
+
+function buildColorPicker() {
+  colorPicker.innerHTML = '';
+  COLORS.forEach(c => {
+    const btn = document.createElement('button');
+    btn.className = 'color-btn' + (c === myColor ? ' selected' : '');
+    btn.style.background = c;
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.color-btn').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected'); myColor = c;
+    });
+    colorPicker.appendChild(btn);
+  });
+}
+
+// ═════════════════════════════════════
+//  MODE
+// ═════════════════════════════════════
+function setupModeSwitcher() {
+  $('playerModeBtn').addEventListener('click', () => setMode('player'));
+  $('teacherModeBtn').addEventListener('click', () => setMode('teacher'));
+}
+function setMode(m) {
+  mode = m;
+  document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+  (mode === 'player' ? $('playerModeBtn') : $('teacherModeBtn')).classList.add('active');
+  renderAll();
+}
+
+// ═════════════════════════════════════
+//  LOBBY
+// ═════════════════════════════════════
+function setupLobby() {
+  joinBtn.addEventListener('click', () => doJoin());
+  nameInput.addEventListener('keydown', e => { if (e.key === 'Enter') doJoin(); });
+}
+async function doJoin() {
+  const name = nameInput.value.trim();
+  if (!name) { nameInput.style.borderColor = '#ff4136'; setTimeout(() => nameInput.style.borderColor = '', 1200); return; }
+  myName = name; joinBtn.disabled = true; joinBtn.textContent = 'Joining...';
+  try {
+    const ref = db.ref('players').push();
+    await ref.set({ name, color: myColor, position: 0, totalAnswered: 0, answers: {}, joinedAt: firebase.database.ServerValue.TIMESTAMP });
+    myId = ref.key;
+    $('playerNameDisplay').textContent = name;
+    $('playerCarName').textContent = name;
+    listenMyCar();
+    renderAll();
+  } catch(e) {
+    console.error(e);
+    alert('Connection error. Set Firebase rules to:\n{ "rules": { ".read": true, ".write": true } }');
+    joinBtn.disabled = false; joinBtn.textContent = '\u{1F3C1} Join the Race!';
+  }
+}
+function listenMyCar() {
+  if (!myId) return;
+  db.ref('players/' + myId).on('value', snap => {
+    const d = snap.val(); if (!d) return;
+    $('playerNameDisplay').textContent = d.name; $('playerCarName').textContent = d.name;
+    const pos = d.position || 0;
+    const pct = 2 + (pos / TOTAL) * 90;
+    $('playerCarWrapper').style.left = Math.min(pct, 92) + '%';
+    $('playerQCount').textContent = (d.totalAnswered || 0) + ' / ' + TOTAL;
+  });
+}
+
+// ═════════════════════════════════════
+//  FIREBASE LISTENERS
+// ═════════════════════════════════════
+function listenGame() {
+  db.ref('game').on('value', snap => {
+    const g = snap.val() || {};
+    phase = g.phase || 'lobby';
+    renderAll();
+  });
+}
+function listenStudents() {
+  db.ref('players').on('value', snap => {
+    students = snap.val() || {};
+    renderAll();
+    checkAutoEnd();
+  });
+}
+
+// ═════════════════════════════════════
+//  AUTO-END DETECTION
+// ═════════════════════════════════════
+function checkAutoEnd() {
+  if (phase !== 'playing' || autoEnding) return;
+  const sArr = Object.values(students);
+  const finished = sArr.filter(s => (s.totalAnswered || 0) >= TOTAL).length;
+  const total = sArr.length;
+  // Auto-end when 3 finish OR when all have finished (if fewer than 3 total)
+  const shouldEnd = (finished >= 3) || (total > 0 && finished >= total);
+  if (shouldEnd && !autoEnding) {
+    autoEnding = true;
+    db.ref('game').update({ phase: 'results' });
+  }
+}
+
+// ═════════════════════════════════════
+//  MASTER RENDER
+// ═════════════════════════════════════
+function renderAll() {
+  lobbyEl.style.display = 'none';
+  playerGameEl.style.display = 'none';
+  teacherViewEl.style.display = 'none';
+  resultsViewEl.style.display = 'none';
+
+  const sArr = Object.values(students);
+
+  if (phase === 'results') {
+    resultsViewEl.style.display = 'flex';
+    showPodium(sArr);
+    renderStandings(sArr);
+    if (myId && students[myId]) {
+      $('resultsAnswersReview').style.display = 'block';
+      renderPlayerAnswers(students[myId]);
+    } else {
+      $('resultsAnswersReview').style.display = 'none';
+    }
+    maybeLaunchConfetti();
+    return;
+  }
+
+  // Reset confetti flag when not in results
+  window._confettiFired = false;
+
+  if (mode === 'teacher') {
+    teacherViewEl.style.display = 'flex';
+    renderTeacher(sArr);
+    return;
+  }
+
+  // Player mode
+  if (!myId) {
+    lobbyEl.style.display = 'flex';
+    $('waitingMsg').classList.add('hidden');
+    joinBtn.disabled = false; joinBtn.textContent = '\u{1F3C1} Join the Race!';
+    return;
+  }
+  if (phase === 'lobby') {
+    lobbyEl.style.display = 'flex';
+    $('waitingMsg').classList.remove('hidden');
+    joinBtn.disabled = true; joinBtn.textContent = 'Joined!';
+    return;
+  }
+  if (phase === 'playing') {
+    playerGameEl.style.display = 'flex';
+    showQuestion();
+  }
+}
+
+// ═════════════════════════════════════
+//  QUESTION (auto-paced)
+// ═════════════════════════════════════
+let myCurrentQ = 0;
+
+function showQuestion() {
+  const myData = students[myId];
+  if (!myData) return;
+
+  // Determine which question to show — the first unanswered
+  let nextQ = -1;
+  for (let i = 0; i < TOTAL; i++) {
+    if (!myData.answers || myData.answers[i] === undefined || myData.answers[i] === null) {
+      nextQ = i; break;
+    }
+  }
+
+  // Cancel any pending auto-advance
+  if (nextQuestionTimer) { clearTimeout(nextQuestionTimer); nextQuestionTimer = null; }
+
+  // All done
+  if (nextQ === -1) {
+    $('qNumber').textContent = 'RACE COMPLETE!';
+    $('qSpanish').textContent = '\u2728';
+    $('qOptions').innerHTML = '';
+    const fb = $('qFeedback');
+    fb.classList.remove('hidden');
+    fb.className = 'correct-feedback';
+    fb.textContent = 'You finished! Waiting for others...';
+    $('qWaiting').classList.add('hidden');
+    return;
+  }
+
+  myCurrentQ = nextQ;
+
+  const q = QUESTIONS[nextQ];
+  $('qSpanish').textContent = '\uD83C\uDDE8\uD83C\uDDF1 ' + q.spanish;
+  $('qNumber').textContent = 'QUESTION ' + (nextQ + 1) + ' of ' + TOTAL;
+
+  const optsDiv = $('qOptions');
+  optsDiv.innerHTML = '';
+  q.options.forEach((opt, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'q-option';
+    btn.textContent = String.fromCharCode(65 + i) + '. ' + opt;
+    btn.addEventListener('click', () => submitAnswer(nextQ, i));
+    optsDiv.appendChild(btn);
+  });
+
+  $('qFeedback').classList.add('hidden');
+  $('qWaiting').classList.add('hidden');
+}
+
+function submitAnswer(qIdx, selected) {
+  if (!myId || !students[myId]) return;
+  if (nextQuestionTimer) return; // debounce
+
+  const q = QUESTIONS[qIdx];
+  const correct = selected === q.correct;
+
+  // Disable buttons
+  const opts = $('qOptions').querySelectorAll('.q-option');
+  opts.forEach((btn, i) => {
+    btn.disabled = true;
+    if (i === q.correct) btn.classList.add('correct');
+    if (i === selected && !correct) btn.classList.add('wrong');
+  });
+
+  const fb = $('qFeedback');
+  fb.classList.remove('hidden');
+  fb.className = correct ? 'correct-feedback' : 'wrong-feedback';
+  fb.innerHTML = correct
+    ? '\u2714 Correct!'
+    : '\u2718 The correct answer is: ' + q.options[q.correct];
+
+  $('qWaiting').classList.remove('hidden');
+
+  // Save to Firebase
+  const ref = db.ref('players/' + myId);
+  ref.child('answers/' + qIdx).set({ selected, correct });
+  if (correct) ref.child('position').transaction(v => (v || 0) + 1);
+  ref.child('totalAnswered').transaction(v => (v || 0) + 1);
+
+  // Auto-advance after delay
+  nextQuestionTimer = setTimeout(() => {
+    nextQuestionTimer = null;
+    renderAll();
+  }, 1200);
+}
+
+// ═════════════════════════════════════
+//  TEACHER — Race Street
+// ═════════════════════════════════════
+function setupTeacherBtns() {
+  $('startBtn').addEventListener('click', startRace);
+  $('endBtn').addEventListener('click', endRace);
+  $('resetBtn').addEventListener('click', resetGame);
+  $('playAgainBtn').addEventListener('click', resetGame);
+}
+async function startRace() {
+  if (Object.keys(students).length === 0) { alert('No players yet!'); return; }
+  autoEnding = false;
+  await db.ref('game').update({ phase: 'playing' });
+}
+async function endRace() {
+  autoEnding = true;
+  await db.ref('game').update({ phase: 'results' });
+}
+async function resetGame() {
+  if (!confirm('Reset entire game? All players and progress will be lost.')) return;
+  autoEnding = false;
+  myId = null; window._confettiFired = false;
+  // Clear all Firebase data then reload with cache-busting
+  await db.ref('game').remove();
+  await db.ref('players').remove();
+  await new Promise(r => setTimeout(r, 800));
+  window.location.href = window.location.pathname + '?t=' + Date.now();
+}
+
+function renderTeacher(sArr) {
+  $('tPlayers').textContent = sArr.length;
+  const finished = sArr.filter(s => (s.totalAnswered || 0) >= TOTAL).length;
+  $('tFinished').textContent = finished;
+  const maxPos = sArr.reduce((m, s) => Math.max(m, s.position || 0), 0);
+  const avgCorrect = sArr.length ? Math.round(sArr.reduce((m, s) => m + (s.position || 0), 0) / sArr.length * 10) / 10 : 0;
+  $('tTopSpeed').textContent = maxPos + '/' + TOTAL;
+
+  $('startBtn').disabled = phase !== 'lobby';
+  $('endBtn').disabled = phase !== 'playing';
+
+  const wrap = $('raceStreetWrap');
+  if (sArr.length === 0) {
+    wrap.innerHTML = '<p style="text-align:center;color:rgba(255,255,255,.2);padding:30px">Waiting for racers...</p>';
+    return;
+  }
+
+  const sorted = [...sArr].sort((a, b) => a.joinedAt - b.joinedAt);
+  // Track markers every 2 positions
+  let markers = '';
+  for (let i = 2; i <= TOTAL; i += 2) {
+    const pct = 2 + (i / TOTAL) * 90;
+    markers += '<div class="lane-marker" style="left:' + pct + '%"></div>';
+  }
+
+  let rows = '';
+  sorted.forEach((s, si) => {
+    const pos = s.position || 0;
+    const ans = s.totalAnswered || 0;
+    const wrong = ans - pos;
+    const pct = 2 + (pos / TOTAL) * 90;
+    const allAnswered = ans >= TOTAL;
+    rows += '<div class="race-lane">'
+      + '<span class="lane-dot" style="background:' + (s.color || '#fff') + '"></span>'
+      + '<span class="lane-name">' + esc(s.name) + '</span>'
+      + '<div class="lane-track-wrap">'
+      +   '<div class="lane-track">'
+      +     '<div class="lane-markers">' + markers + '</div>'
+      +     '<div class="lane-finish"></div>'
+      +     '<div class="lane-car" style="left:' + Math.min(pct, 92) + '%;color:' + (s.color || '#fff') + '">'
+            + (allAnswered ? '&#127937;' : '&#128663;')
+      +     '</div>'
+      +   '</div>'
+      + '</div>'
+      + '<span class="lane-pos-text">' + pos + '/' + TOTAL + '</span>'
+      + '</div>';
+  });
+
+  wrap.innerHTML = '<div class="race-street-header">'
+    + '<span class="rsh-name">Racer</span>'
+    + '<span class="rsh-track">Race Track</span>'
+    + '<span class="rsh-pos">Score</span>'
+    + '</div>' + rows;
+}
+
+// ═════════════════════════════════════
+//  RESULTS / PODIUM
+// ═════════════════════════════════════
+function showPodium(sArr) {
+  const sorted = [...sArr].sort((a, b) => (b.position || 0) - (a.position || 0));
+  const top3 = sorted.slice(0, 3);
+  const podium = $('podium'); podium.innerHTML = '';
+
+  if (top3.length === 0) { podium.innerHTML = '<p style="color:rgba(255,255,255,.2)">No results.</p>'; return; }
+
+  const order = top3.length >= 2 ? [1, 0, 2] : [0];
+  const medals = ['&#129352;','&#129351;','&#129353;'];
+  const classes = ['podium-2','podium-1','podium-3'];
+  const labels = ['2nd','1st','3rd'];
+
+  for (const idx of order) {
+    if (idx >= top3.length) continue;
+    const p = top3[idx];
+    const correct = p.position || 0;
+    const wrong = (p.totalAnswered || 0) - correct;
+    const div = document.createElement('div');
+    div.className = 'podium-place ' + classes[idx];
+    div.innerHTML = '<div class="trophy">' + medals[idx] + '</div>'
+      + '<div class="place-name" style="color:' + (p.color || '#fff') + '">' + esc(p.name) + '</div>'
+      + '<div class="place-score">' + correct + ' correct / ' + wrong + ' wrong</div>'
+      + '<div class="podium-block"><div class="podium-label">' + labels[idx] + '</div></div>';
+    podium.appendChild(div);
+  }
+}
+
+function renderStandings(sArr) {
+  const sorted = [...sArr].sort((a, b) => (b.position || 0) - (a.position || 0) || (a.totalAnswered || 0) - (b.totalAnswered || 0));
+  const list = $('standingsList'); list.innerHTML = '';
+  const showFull = sorted.length > 3;
+  $('fullStandings').style.display = showFull ? 'block' : 'none';
+  if (!showFull) return;
+  sorted.forEach((s, i) => {
+    const correct = s.position || 0;
+    const wrong = (s.totalAnswered || 0) - correct;
+    const row = document.createElement('div'); row.className = 'standing-row';
+    const rankClass = i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : '';
+    row.innerHTML = '<span class="sr-rank ' + rankClass + '">#' + (i + 1) + '</span>'
+      + '<span class="sr-dot" style="background:' + (s.color || '#fff') + '"></span>'
+      + '<span class="sr-name">' + esc(s.name) + '</span>'
+      + '<span class="sr-stats"><span class="sr-correct">' + correct + ' correct</span> / <span class="sr-wrong">' + wrong + ' wrong</span>' + (correct + wrong < TOTAL ? ' (' + (TOTAL - correct - wrong) + ' left)' : '') + '</span>';
+    list.appendChild(row);
+  });
+}
+
+function renderPlayerAnswers(p) {
+  const correct = p.position || 0;
+  const wrong = (p.totalAnswered || 0) - correct;
+  $('resultsAnswersHeading').textContent = esc(p.name) + "'s Results \u2014 " + correct + ' correct, ' + wrong + ' wrong';
+  const list = $('resultsAnswersList'); list.innerHTML = '';
+  QUESTIONS.forEach((q, i) => {
+    const a = p.answers && p.answers[i];
+    const row = document.createElement('div'); row.className = 'answer-row';
+    const correct = a && a.correct;
+    const display = a ? (correct ? '\u2714' : '\u2718 ' + q.options[q.correct]) : '-';
+    row.innerHTML = '<span class="a-text">' + (i+1) + '. <em>' + q.spanish + '</em> ' + q.options[0] + ' / ' + q.options[1] + '</span>'
+      + '<span class="a-result ' + (a ? (correct ? 'correct' : 'wrong') : '') + '">' + display + '</span>';
+    list.appendChild(row);
+  });
+}
+
+// ═════════════════════════════════════
+//  CONFETTI
+// ═════════════════════════════════════
+function maybeLaunchConfetti() {
+  if (window._confettiFired) return;
+  window._confettiFired = true;
+  const c = $('confettiContainer'); c.innerHTML = '';
+  const colors = ['#ff4136','#ff851b','#ffdc00','#2ecc40','#0074d9','#b10dc9','#e91e63','#00bcd4'];
+  for (let i = 0; i < 100; i++) {
+    const e = document.createElement('div'); e.className = 'confetti';
+    e.style.left = Math.random() * 100 + '%';
+    e.style.background = colors[Math.floor(Math.random() * colors.length)];
+    e.style.width = (5 + Math.random() * 10) + 'px';
+    e.style.height = (5 + Math.random() * 10) + 'px';
+    e.style.borderRadius = Math.random() > .5 ? '50%' : '2px';
+    e.style.animationDuration = (2 + Math.random() * 3) + 's';
+    e.style.animationDelay = (Math.random() * 2.5) + 's';
+    c.appendChild(e);
+  }
+  setTimeout(() => c.innerHTML = '', 6000);
+}
+
+function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+// ═════════════════════════════════════
+//  START
+// ═════════════════════════════════════
+init();
+</script>
+</body>
+</html>
